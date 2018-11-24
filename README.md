@@ -237,4 +237,49 @@ HDFS Hadoop分布式文件系统
     ，如打开，关闭，重命名文件或目录。它也负责确定数据块到具体Datanode节点的映
     射。Datanode负责处理文件系统客户端的读写请求。在Namenode的统一调度下进行数据块的创建
     ，删除与复制。
+  
+       HDFS采用Master/Slave的架构来存储数据，这种架构主要由四部分组成分别为:
+           HDFS Client, NameNode, DataNode, Secondary NameNode
+
+       HDFS Client:
+            1) 文件切分。文件上传HDFS的时候，Client将文件切分成一个一个的Block，然后进
+               行存储。
+            2）与NameNode交互，获取文件的位置信息
+            3）与DataNode交互，读取或者写入文件
+            5）Client提供了一些命令来管理HDFS，比如启动或者关闭HDFS
+            6）Client可以通过一些命令来访问HDFS
+
+       NameNode:
+            就是Master，它是一个主管，管理者
+            1）管理HDFS的命名空间
+            2）管理数据块(Block)映射信息
+            3）配置副本策略
+            5）处理客户端读写请求
+
+       DataNode：
+            就是Slave，NameNode下达命令，DataNode执行实际的操作。
+            1）存储实际的数据块
+            2）执行数据块的读写操作
+       
+       Secondary NameNode：
+            并非NameNode的热备。当NameNode挂掉的时候，它并不能马上替换NameNode并提供服务。
+            1）辅助NameNode，分担其工作量
+            2）定期合并fsimage和fsedits，并推送给NameNode
+            3）在紧急情况下，可辅助回复NameNode
+
+    HDFS的文件读取：
+            主要步骤如下
+                1）首先调用FileSystem对象的open方法，其实获取的是一个DistributedFileSystem的实例。
+                2）DistributedFileSystem通过RPC获得文件的第一批block的locations,
+                同一block按照重复数会返回多个locations,这些locations按照hadoop拓补
+                结构排序，具体客户端最近的排在最前面。
+                3）前两步会返回一个FSDataInputStream对象，该对象会被封装成DFSInputStream对象，DFSInputStream可以方便的管理datanode和namenode
+                数据流。客户端调用read方法，DFSInputStream就会找出离客户端最近的datanode并连接datanode.
+                5) 数据从datanode源源不断的流向客户端。
+                6）如果第一个block块的数据读完了，就会关闭指向第一个block块的datanode
+                连接，接着读取下一个block块，这些操作对于客户端来说是透明的，从客户端角
+                度来看只是读一个持续不断的流。
+                7）如果第一批block都读完了，DataInputStream就会去namenode拿下一批
+                blocks的location，然后继续读，如果所有的block块都读完，这时就会关闭
+                掉所有的流。
 </pre>
