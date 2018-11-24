@@ -282,4 +282,25 @@ HDFS Hadoop分布式文件系统
                 7）如果第一批block都读完了，DataInputStream就会去namenode拿下一批
                 blocks的location，然后继续读，如果所有的block块都读完，这时就会关闭
                 掉所有的流。
+
+    HDFS的文件写入：
+            主要步骤如下：
+                1）客户端通过调用DistributedFileSystem的create方法，创建一个新的文件。
+                2）DistributedFileSystem通过RPC调用NameNode，去创建一个没有blocks
+                关联的新文件，创建前，NameNode会做各种校验，比如文件是否存在，客户端有
+                无权限去创建等。如果校验通过，NameNode就会记录下新文件，否则就会抛出异常。
+                3）前两步接收会返回FSDataOutputStream对象，和文件读取的时候相似。
+                FSDataOutputStream被封装成DFSOutputStream可以协调NameNode和
+                DataNode，客户端开始写数据到DFSOutputStream， DFSOutputStream会把
+                数据切成一个个小packet，然后排成队列data queue.
+                5) DataStreamer会去处理接收data queue，它先问询NameNode这个新的
+                block最适合存储在哪几个DataNode里，比如重复数是3，那么就找到3个最适合
+                的DataNode，把它们排成一个pipeline。DataStreamer把packet按队列输出
+                到管道的第一个DataNode里，第一个DataNode又把packet输出到第二个DataNode中，以此类推。
+                6）DFSOutputStream还有一个队列ack queue，也是由packet组成，等待
+                DataNode的收到响应，当pipeline中的所有DataNode都表示已经收到的时候，
+                这时ack queue才会把对应的packet包移除掉。
+                7）客户端完成写数据后，调用close方法关闭写入流。
+                8）DataStreamer把剩余的包都刷到pipeline里，然后等待ack信息，收到最后
+                一个ack后，通知DataNode把文件标识为已完成。 
 </pre>
